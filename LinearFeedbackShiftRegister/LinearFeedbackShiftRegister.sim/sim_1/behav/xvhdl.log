@@ -1,0 +1,8 @@
+INFO: [VRFC 10-163] Analyzing VHDL file "C:/Users/Andrei Eminovici/Desktop/AN2SEM1/Linear_Feedback_Shift_Register/LinearFeedbackShiftRegister/LinearFeedbackShiftRegister.srcs/sources_1/new/LFSR4_5.vhd" into library xil_defaultlib
+INFO: [VRFC 10-307] analyzing entity LFSR4_5
+INFO: [VRFC 10-163] Analyzing VHDL file "C:/Users/Andrei Eminovici/Desktop/AN2SEM1/Linear_Feedback_Shift_Register/LinearFeedbackShiftRegister/LinearFeedbackShiftRegister.srcs/sources_1/new/sev_seg.vhd" into library xil_defaultlib
+INFO: [VRFC 10-307] analyzing entity sev_seg
+INFO: [VRFC 10-163] Analyzing VHDL file "C:/Users/Andrei Eminovici/Desktop/AN2SEM1/Linear_Feedback_Shift_Register/LinearFeedbackShiftRegister/LinearFeedbackShiftRegister.srcs/sources_1/new/mpg.vhd" into library xil_defaultlib
+INFO: [VRFC 10-307] analyzing entity mpg
+INFO: [VRFC 10-163] Analyzing VHDL file "C:/Users/Andrei Eminovici/Desktop/AN2SEM1/Linear_Feedback_Shift_Register/LinearFeedbackShiftRegister/LinearFeedbackShiftRegister.srcs/sources_1/new/main_fpga.vhd" into library xil_defaultlib
+INFO: [VRFC 10-307] analyzing entity main_fpga

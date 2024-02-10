@@ -1,0 +1,341 @@
+LIBRARY ieee;
+USE ieee.std_logic_1164.ALL;
+USE ieee.std_logic_unsigned.ALL;
+USE ieee.std_logic_arith.ALL;
+
+ENTITY LFSR4_5 IS
+	PORT (clk_100mhz, Rst: IN std_logic;					
+	looplen: IN std_logic_vector(0 to 4);
+	variant: IN std_logic; --'0' means 4 bit, '1' means 5 bit
+	catemp: OUT std_logic_vector(0 to 6);
+	antemp: OUT std_logic_vector(0 to 7);
+	Clk: INOUT std_logic;	
+	output: INOUT std_logic_vector(0 to 4));
+END LFSR4_5;
+
+ARCHITECTURE LFSR4_5_beh of LFSR4_5 IS
+	SIGNAL Currstate: std_logic_vector(0 to 4);
+	SIGNAL feedback, Control, Extend, STALL: std_logic; --Extend = Gate B; Control = Gate C
+	SIGNAL count: std_logic_vector(0 to 26) := (others => '0');
+	SIGNAL tempu,tempt,tlen0,tlen1,variantCase: std_logic_vector(0 to 3);
+	component full_display is
+	port (
+			clkd : in std_logic;
+			unit : in std_logic_vector(0 to 3);
+			tens : in std_logic_vector(0 to 3);
+			len0 : in std_logic_vector(0 to 3);
+			len1 : in std_logic_vector(0 to 3);
+			letter_L : in std_logic_vector(0 to 3);
+			letter_V : in std_logic_vector(0 to 3);
+			vP : in std_logic_vector(0 to 3);
+			cat : out std_logic_vector(0 to 6);
+			an : out std_logic_vector(0 to 7)
+		  );
+end component;
+
+BEGIN
+	Freqdiv: PROCESS(clk_100mhz)
+	BEGIN
+		IF(count = "111111111111111111111111111") THEN  --262 million
+			Clk <= NOT Clk;
+			count <= (others => '0');
+		ELSIF(clk_100mhz = '1' and clk_100mhz'EVENT) THEN
+			count <= count+1;
+		END IF;
+	END PROCESS; 
+		C0: full_display port map (	
+								clkd => clk_100mhz,
+								unit => tempu,
+								tens => tempt,
+								cat => catemp,
+								an => antemp,
+								len0 => tlen0,
+								len1 =>	tlen1,
+								letter_L => "1110",
+								letter_V => "1101",
+								vP => variantCase
+						   );
+	UpdateState: PROCESS(Clk, Rst)
+	BEGIN
+		
+		IF(Rst = '0') THEN			   --Rst is active low
+			Currstate <=("00000");
+		ELSIF (Clk = '1' AND Clk'EVENT) THEN
+			IF(variant = '0') THEN				  --Selective shifting of register to avoid changing first bit;
+				Currstate(0) <= '0';			  --This matters when we only want to use 4 bits
+				Currstate(4) <= Currstate(3);
+				Currstate(3) <= Currstate(2);
+				Currstate(2) <= Currstate(1);
+				Currstate(1) <= feedback;
+			ELSE
+				Currstate <= feedback & Currstate(0 to 3);	--Straight forward shifting done for the 5-bit variant
+			END IF;
+			output <= Currstate;
+		END IF;
+		
+		
+		STALL <= (NOT looplen(0)) AND (NOT looplen(1)) AND (NOT looplen(2)) AND (NOT looplen(3)) AND (NOT looplen(4)); --By default, stalling of circuit counting is disabled and will only
+																													   --enable when looplen's value is 0
+		
+		Extend <= (Currstate(0) OR (NOT variant)) AND Currstate(1) AND Currstate(2) AND Currstate(3); --Gate B; By default, loop is extended. To disable this, Extend AND Currstate(4)
+		--Currstate(0) can be ignored when variant = '0' for the 4-bit case, thanks to '1' being absorbant element for OR gate and neutral element for AND gate
+			
+		
+		
+		IF(variant = '0') THEN
+		--4 bit case
+			variantCase <= "0100";
+			CASE looplen is    --Connect Q4 At "AND" Gate B for 4,8,12 and 16
+    			WHEN "01111" => Control <= '0'; --16 (do nothing but keep loop extended)
+				tlen0 <= "0001"; tlen1 <= "0110";
+				WHEN "01110" => Extend <= Extend AND Currstate(4); Control <= '0'; --15 (same as 16, but avoid extending loop into '1111' state)
+				tlen0 <= "0001"; tlen1 <= "0101";				
+				WHEN "01101" => Control <= (NOT Currstate(1)) AND Currstate(2) AND (NOT Currstate(3)) AND (NOT Currstate(4)); --14
+				tlen0 <= "0001"; tlen1 <= "0100";
+				WHEN "01100" => Control <= (NOT Currstate(1)) AND Currstate(2) AND Currstate(3) AND Currstate(4); --13
+				tlen0 <= "0001"; tlen1 <= "0011";
+				WHEN "01011" => Extend <= Extend AND Currstate(4); Control <= (NOT Currstate(1)) AND Currstate(2) AND Currstate(3) AND Currstate(4); --12 (13 without extension)
+				tlen0 <= "0001"; tlen1 <= "0010";
+				WHEN "01010" => Control <= Currstate(1) AND Currstate(2) AND (NOT Currstate(3)) AND (NOT Currstate(4)); --11
+				tlen0 <= "0001"; tlen1 <= "0001";
+				WHEN "01001" => Control <= Currstate(1) AND (NOT Currstate(2)) AND Currstate(3) AND Currstate(4); --10
+				tlen0 <= "0001"; tlen1 <= "0000";
+				WHEN "01000" => Control <= Currstate(1) AND (NOT Currstate(2)) AND (NOT Currstate(3)) AND Currstate(4); --9
+				tlen0 <= "0000"; tlen1 <= "1001";
+				WHEN "00111" => Extend <= Extend AND Currstate(4); Control <= Currstate(1) AND (NOT Currstate(2)) AND (NOT Currstate(3)) AND Currstate(4); --8 (9 without extension)
+				tlen0 <= "0000"; tlen1 <= "1000";
+				WHEN "00110" => Control <= Currstate(1) AND (NOT Currstate(2)) AND (NOT Currstate(3)) AND (NOT Currstate(4)); --7
+				tlen0 <= "0000"; tlen1 <= "0111";
+				WHEN "00101" => Control <= Currstate(1) AND (NOT Currstate(2)) AND Currstate(3) AND (NOT Currstate(4)); --6
+				tlen0 <= "0000"; tlen1 <= "0110";
+				WHEN "00100" => Control <= (NOT Currstate(1)) AND (NOT Currstate(2)) AND Currstate(3) AND (NOT Currstate(4)); --5
+				tlen0 <= "0000"; tlen1 <= "0101";
+				WHEN "00011" => Extend <= Extend AND Currstate(4); Control <= Currstate(1) AND Currstate(2) AND (NOT Currstate(3)) AND Currstate(4); --4
+				tlen0 <= "0000"; tlen1 <= "0100";
+				WHEN "00010" => Control <= (NOT Currstate(1)) AND Currstate(2) AND Currstate(3) AND (NOT Currstate(4)); --3
+				tlen0 <= "0000"; tlen1 <= "0011";
+				WHEN "00001" => Control <= (NOT Currstate(1)) AND Currstate(2) AND (NOT Currstate(3)) AND Currstate(4); --2
+				tlen0 <= "0000"; tlen1 <= "0010";
+				WHEN "00000" => tlen0 <= "0000"; tlen1 <= "0001";
+				WHEN others => Control <= '0'; --Redundant
+				tlen0 <= "1111"; tlen1 <= "1111";
+			END CASE;
+		ELSE 
+		--5 bit case
+		variantCase <= "0101";
+			CASE looplen is    --Connect Q5 At "AND" Gate B for 5,10,14,16,18,22,27 and 31	
+				WHEN "11111" => Control <= '0'; 		--32
+				tlen0 <= "0011"; tlen1 <= "0010";
+				WHEN "11110" => Extend <= Extend AND Currstate(4); Control <= '0'; 		--31
+				tlen0 <= "0011"; tlen1 <= "0001";
+				WHEN "11101" => Control <= Currstate(0) AND (NOT Currstate(1)) AND Currstate(2) AND (NOT Currstate(3)) AND (NOT Currstate(4));  		--30
+				tlen0 <= "0011"; tlen1 <= "0000";
+				WHEN "11100" => Control <= Currstate(0) AND (NOT Currstate(1)) AND Currstate(2) AND Currstate(3) AND Currstate(4); 		--29
+				tlen0 <= "0010"; tlen1 <= "1001";
+				WHEN "11011" => Control <= (NOT Currstate(0)) AND Currstate(1) AND (NOT Currstate(2)) AND (NOT Currstate(3)) AND Currstate(4);  		--28
+				tlen0 <= "0010"; tlen1 <= "1000";
+				WHEN "11010" => Control <= (NOT Currstate(0)) AND Currstate(1) AND (NOT Currstate(2)) AND (NOT Currstate(3)) AND Currstate(4); Extend <= Extend AND Currstate(4);  		--27
+				tlen0 <= "0010"; tlen1 <= "0111";
+				WHEN "11001" => Control <= (NOT Currstate(0)) AND Currstate(1) AND Currstate(2) AND (NOT Currstate(3)) AND Currstate(4); 		 --26
+				tlen0 <= "0010"; tlen1 <= "0110";
+				WHEN "11000" => Control <= Currstate(0) AND Currstate(1) AND (NOT Currstate(2)) AND (NOT Currstate(3)) AND Currstate(4); 		 --25
+				tlen0 <= "0010"; tlen1 <= "0101";
+				WHEN "10111" => Control <= (NOT Currstate(0)) AND (NOT Currstate(1)) AND Currstate(2) AND Currstate(3) AND (NOT Currstate(4));  		--24
+				tlen0 <= "0010"; tlen1 <= "0100";
+				WHEN "10110" => Control <= Currstate(0) AND (NOT Currstate(1)) AND (NOT Currstate(2)) AND (NOT Currstate(3)) AND (NOT Currstate(4));  		--23
+				tlen0 <= "0010"; tlen1 <= "0011";
+				WHEN "10101" => Control <= Currstate(0) AND (NOT Currstate(1)) AND (NOT Currstate(2)) AND (NOT Currstate(3)) AND (NOT Currstate(4)); Extend <= Extend AND Currstate(4);  		--22
+				tlen0 <= "0010"; tlen1 <= "0010";
+				WHEN "10100" => Control <= (NOT Currstate(0)) AND Currstate(1) AND (NOT Currstate(2)) AND Currstate(3) AND (NOT Currstate(4));  		--21
+				tlen0 <= "0010"; tlen1 <= "0001";
+				WHEN "10011" => Control <= Currstate(0) AND (NOT Currstate(1)) AND (NOT Currstate(2)) AND Currstate(3) AND (NOT Currstate(4));  		--20
+				tlen0 <= "0010"; tlen1 <= "0000";
+				WHEN "10010" => Control <= Currstate(0) AND Currstate(1) AND Currstate(2) AND (NOT Currstate(3)) AND (NOT Currstate(4));  		--19
+				tlen0 <= "0001"; tlen1 <= "1001";
+				WHEN "10001" => Control <= Currstate(0) AND Currstate(1) AND Currstate(2) AND (NOT Currstate(3)) AND (NOT Currstate(4)); Extend <= Extend AND Currstate(4);  		--18
+				tlen0 <= "0001"; tlen1 <= "1000";
+				WHEN "10000" => Control <= (NOT Currstate(0)) AND Currstate(1) AND Currstate(2) AND Currstate(3) AND (NOT Currstate(4));  		--17
+				tlen0 <= "0001"; tlen1 <= "0111";
+				WHEN "01111" => Control <= (NOT Currstate(0)) AND (NOT Currstate(1)) AND Currstate(2) AND (NOT Currstate(3)) AND Currstate(4); Extend <= Extend AND Currstate(4);  		--16
+				tlen0 <= "0001"; tlen1 <= "0110";
+				WHEN "01110" => Control <= (NOT Currstate(0)) AND Currstate(1) AND Currstate(2) AND Currstate(3) AND Currstate(4);  		--15
+				tlen0 <= "0001"; tlen1 <= "0101";
+				WHEN "01101" => Control <= (NOT Currstate(0)) AND Currstate(1) AND Currstate(2) AND Currstate(3) AND Currstate(4); Extend <= Extend AND Currstate(4);  		--14
+				tlen0 <= "0001"; tlen1 <= "0100";
+				WHEN "01100" => Control <= Currstate(0) AND Currstate(1) AND Currstate(2) AND (NOT Currstate(3)) AND Currstate(4);  		--13
+				tlen0 <= "0001"; tlen1 <= "0011";
+				WHEN "01011" => Control <= Currstate(0) AND (NOT Currstate(1)) AND (NOT Currstate(2)) AND Currstate(3) AND Currstate(4);  		--12
+				tlen0 <= "0001"; tlen1 <= "0010";
+				WHEN "01010" => Control <= (NOT Currstate(0)) AND Currstate(1) AND (NOT Currstate(2)) AND Currstate(3) AND Currstate(4);  		--11
+				tlen0 <= "0001"; tlen1 <= "0001";
+				WHEN "01001" => Control <= (NOT Currstate(0)) AND Currstate(1) AND (NOT Currstate(2)) AND Currstate(3) AND Currstate(4); Extend <= Extend AND Currstate(4);  		--10
+				tlen0 <= "0001"; tlen1 <= "0000";
+				WHEN "01000" => Control <= Currstate(0) AND (NOT Currstate(1)) AND (NOT Currstate(2)) AND (NOT Currstate(3)) AND Currstate(4);  		--9
+				tlen0 <= "0000"; tlen1 <= "1001";
+				WHEN "00111" => Control <= (NOT Currstate(0)) AND (NOT Currstate(1)) AND Currstate(2) AND Currstate(3) AND Currstate(4);  		--8
+				tlen0 <= "0000"; tlen1 <= "1000";
+				WHEN "00110" => Control <= Currstate(0) AND Currstate(1) AND (NOT Currstate(2)) AND (NOT Currstate(3)) AND (NOT Currstate(4));  		--7
+				tlen0 <= "0000"; tlen1 <= "0111";
+				WHEN "00101" => Control <= Currstate(0) AND Currstate(1) AND (NOT Currstate(2)) AND Currstate(3) AND Currstate(4);  		--6
+				tlen0 <= "0000"; tlen1 <= "0110";
+				WHEN "00100" => Control <= Currstate(0) AND Currstate(1) AND (NOT Currstate(2)) AND Currstate(3) AND Currstate(4); Extend <= Extend AND Currstate(4);  		--5
+				tlen0 <= "0000"; tlen1 <= "0101";
+				WHEN "00011" => Control <= (NOT Currstate(0)) AND Currstate(1) AND (NOT Currstate(2)) AND (NOT Currstate(3)) AND (NOT Currstate(4));  		--4
+				tlen0 <= "0000"; tlen1 <= "0100";
+				WHEN "00010" => Control <= Currstate(0) AND (NOT Currstate(1)) AND Currstate(2) AND Currstate(3) AND (NOT Currstate(4));  		--3
+				tlen0 <= "0000"; tlen1 <= "0011";
+				WHEN "00001" => Control <= Currstate(0) AND (NOT Currstate(1)) AND Currstate(2) AND (NOT Currstate(3)) AND Currstate(4);  		--2
+				tlen0 <= "0000"; tlen1 <= "0010";
+				WHEN "00000" => tlen0 <= "0000"; tlen1 <= "0001";
+				WHEN others => Control <= '0'; tlen0 <= "1111"; tlen1 <= "1111"; --error case
+			END CASE;
+		END IF;
+				CASE output is
+			WHEN "11111" => tempu <= "0001"; tempt <= "0011"; --31
+			WHEN "11110" => tempu <= "0000"; tempt <= "0011"; --30
+			WHEN "11101" => tempu <= "1001"; tempt <= "0010"; --29
+			WHEN "11100" => tempu <= "1000"; tempt <= "0010"; --28
+			WHEN "11011" => tempu <= "0111"; tempt <= "0010"; --27
+			WHEN "11010" => tempu <= "0110"; tempt <= "0010"; --26
+			WHEN "11001" => tempu <= "0101"; tempt <= "0010"; --25
+			WHEN "11000" => tempu <= "0100"; tempt <= "0010"; --24
+			WHEN "10111" => tempu <= "0011"; tempt <= "0010"; --23
+			WHEN "10110" => tempu <= "0010"; tempt <= "0010"; --22
+			WHEN "10101" => tempu <= "0001"; tempt <= "0010"; --21
+			WHEN "10100" => tempu <= "0000"; tempt <= "0010"; --20
+			WHEN "10011" => tempu <= "1001"; tempt <= "0001"; --19
+			WHEN "10010" => tempu <= "1000"; tempt <= "0001"; --18
+			WHEN "10001" => tempu <= "0111"; tempt <= "0001"; --17
+			WHEN "10000" => tempu <= "0110"; tempt <= "0001"; --16
+			WHEN "01111" => tempu <= "0101"; tempt <= "0001"; --15
+			WHEN "01110" => tempu <= "0100"; tempt <= "0001"; --14
+			WHEN "01101" => tempu <= "0011"; tempt <= "0001"; --13
+			WHEN "01100" => tempu <= "0010"; tempt <= "0001"; --12
+			WHEN "01011" => tempu <= "0001"; tempt <= "0001"; --11
+			WHEN "01010" => tempu <= "0000"; tempt <= "0001"; --10
+			WHEN "01001" => tempu <= "1001"; tempt <= "0000"; --9
+			WHEN "01000" => tempu <= "1000"; tempt <= "0000"; --8
+			WHEN "00111" => tempu <= "0111"; tempt <= "0000"; --7
+			WHEN "00110" => tempu <= "0110"; tempt <= "0000"; --6
+			WHEN "00101" => tempu <= "0101"; tempt <= "0000"; --5
+			WHEN "00100" => tempu <= "0100"; tempt <= "0000"; --4
+			WHEN "00011" => tempu <= "0011"; tempt <= "0000"; --3
+			WHEN "00010" => tempu <= "0010"; tempt <= "0000"; --2
+			WHEN "00001" => tempu <= "0001"; tempt <= "0000"; --1
+			WHEN "00000" => tempu <= "0000"; tempt <= "0000"; --0
+			WHEN others => tempu <= "1111"; tempt <= "1111"; --error
+			END CASE;
+		
+	END PROCESS;
+		feedback <=(((Currstate(2) OR (NOT variant)) XNOR (Currstate(3) OR variant) XNOR Currstate(4)) XOR (Control OR Extend)) AND (NOT STALL); --as long as STALL is disabled, it will not affect feedback
+		--I want to have Currstate(2) not matter when variant = '0' and Currstate(2) matter and Currstate(3) not matter when variant = '1'
+		--Since 1 is neutral element in XNOR operation, I want to turn it off by making it be equal to 1, so 2 will be off when var = 0 and on when var = 1, similarly but opposite with 3
+		
+
+END LFSR4_5_beh;
+
+
+
+library ieee;
+use ieee.std_logic_1164.all;
+
+ENTITY seven_seg IS
+	PORT ( 
+			inputs : IN std_logic_vector(0 to 3);
+			outputs : OUT std_logic_vector(0 to 6)
+		  );
+end entity;
+
+ARCHITECTURE behavioural OF seven_seg IS --negative logic
+BEGIN
+	PROCESS(inputs)
+	BEGIN
+		CASE inputs IS
+			WHEN "0000" => outputs <= "0000001"; --0
+			WHEN "0001" => outputs <= "1001111"; --1
+			WHEN "0010" => outputs <= "0010010"; --2
+			WHEN "0011" => outputs <= "0000110"; --3
+			WHEN "0100" => outputs <= "1001100"; --4
+			WHEN "0101" => outputs <= "0100100"; --5
+			WHEN "0110" => outputs <= "0100000"; --6
+			WHEN "0111" => outputs <= "0001111"; --7
+			WHEN "1000" => outputs <= "0000000"; --8
+			WHEN "1001" => outputs <= "0000100"; --9
+			WHEN "1111" => outputs <= "1111111"; --nothing
+			WHEN "1110" => outputs <= "1110001"; -- letter 'L'
+			WHEN "1101" => outputs <= "1100011"; -- letter 'V'
+			WHEN others => outputs <= "0110000"; -- E for forbidden cases
+		END CASE;
+	END PROCESS;
+END ARCHITECTURE;
+
+
+
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.std_logic_arith.all;
+use ieee.std_logic_unsigned.all;
+
+entity full_display is
+	port (
+			clkd : in std_logic;
+			unit : in std_logic_vector(0 to 3);
+			tens : in std_logic_vector(0 to 3);
+			len0 : in std_logic_vector(0 to 3);
+			len1 : in std_logic_vector(0 to 3);
+			letter_L : in std_logic_vector(0 to 3);
+			letter_V : in std_logic_vector(0 to 3);
+			vP : in std_logic_vector(0 to 3);
+			cat : out std_logic_vector(0 to 6);
+			an : out std_logic_vector(0 to 7)
+		  );
+end entity;
+
+architecture display of full_display is
+
+component seven_seg is
+	port ( 
+			inputs : in std_logic_vector(0 to 3);
+			outputs : out std_logic_vector(0 to 6)
+		  );
+end component;
+
+signal counter : std_logic_vector(0 to 15) := (others => '0');
+signal mux : std_logic_vector(0 to 3) := (others => '0');
+signal nullsym : std_logic_vector(0 to 3) := (others =>'1');
+
+begin
+	process(clkd)
+	begin
+		if clkd'event and clkd = '1' then
+			if counter = "1111111111111111" then
+				counter <= (others => '0');
+			else
+				counter <= counter + '1';
+			end if;
+		end if;
+	end process;
+	
+	mux <= letter_L when counter(0 to 2) = "000" else
+		   len0 when counter(0 to 2) = "001" else
+			len1 when counter(0 to 2) = "010" else
+		   letter_V when counter(0 to 2) = "011" else
+			vP when counter(0 to 2) = "100" else
+		   nullsym when counter(0 to 2) = "101" else
+			unit when counter(0 to 2) = "110" else
+		   tens when counter(0 to 2) = "111";
+		   
+	an <= "01111111" when counter(0 to 2) = "000" else
+		   "10111111" when counter(0 to 2) = "001" else
+			"11011111" when counter(0 to 2) = "010" else
+		   "11101111" when counter(0 to 2) = "011" else
+			"11110111" when counter(0 to 2) = "100" else
+		   "11111011" when counter(0 to 2) = "101" else
+			"11111101" when counter(0 to 2) = "110" else
+		   "11111110" when counter(0 to 2) = "111";
+	
+	C0: seven_seg port map (	-- component => entity
+								inputs => mux,
+								outputs => cat
+						   );
+end architecture;
