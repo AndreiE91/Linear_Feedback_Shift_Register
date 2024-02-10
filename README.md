@@ -11,11 +11,10 @@
 7. [Simulated Behavior Results](#simulated-behavior-results)
 8. [User Manual](#user-manual)
 9. [Future Developments](#future-developments)
-10. [Bibliography](#bibliography)
 
 ## 1. Project Specification:
 
-Implement linear feedback counters (LFSR) based on the documentation in "Designing Numerical Systems Using FPGA Technology" by S. Nedevschi, Z. Baruch, and O. Cret (available at UTCN Library). The project involves implementing LFSR with input parameters for the counting loop length and the selection of 4-bit or 5-bit variants.
+Implement linear feedback counters (LFSR). The project involves implementing LFSR with input parameters for the counting loop length and the selection of 4-bit or 5-bit variants.
 
 ## 2. Black Box:
 
@@ -48,7 +47,3 @@ The user manual explains the operation starting from the reset state, setting th
 ## 9. Future Developments:
 
 Potential future developments include expanding the project beyond 5 bits, exploring applications in cryptography, and optimizing loop length computation for higher bit counts.
-
-## 10. Bibliography:
-
-The project is based on the documentation provided in "Designing Numerical Systems Using FPGA Technology" by S. Nedevschi, Z. Baruch, and O. Cret, specifically Chapter 4.
