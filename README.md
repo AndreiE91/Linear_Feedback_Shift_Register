@@ -11,6 +11,8 @@
   </tr>
 </table>
 
+![LFSR_gif](presentation/LFSR_gif.gif)
+
 ## Table of Contents:
 
 1. [Project Specification](#project-specification)
