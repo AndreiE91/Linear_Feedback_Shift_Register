@@ -25,7 +25,7 @@
 
 ## 1. Project Specification:
 
-A6) Implement linear feedback counters (LFSR). The designed system receives as inputs the length of the counting loop and the selection of the 4-bit or 5-bit variant.
+Implement linear feedback counters (LFSR). The designed system receives as inputs the length of the counting loop and the selection of the 4-bit or 5-bit variant.
 
 ## 2. Black Box:
 
