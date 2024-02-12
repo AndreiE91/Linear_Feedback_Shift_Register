@@ -105,4 +105,4 @@ git clone https://github.com/AndreiE91/Linear_Feedback_Shift_Register.git
 cd Linear_Feedback_Shift_Register
 ```
 
-Open and build the project in Visual Studio afterwards.
+Open and implement the project in Vivado or any other VHDL tool afterwards.
